@@ -122,12 +122,10 @@ public class XADDiagram {
 
 	public Double integrate(List<String> booleanVariables, List<String> continuousVariables) {
 		int boolOnly = fold(this.number, XADDBuild.context::computeDefiniteIntegral, continuousVariables);
-		new XADDiagram(boolOnly).show("bool only");
 		return new XADDiagram(boolOnly).walk(new IntegrationObserver(set(booleanVariables)));
 	}
 
 	private Double evaluateIntegration(Set<String> variables, int nodeId) {
-
 		XADD.XADDNode node = XADDBuild.context.getNode(nodeId);
 		if(node instanceof XADD.XADDTNode) {
 			return Math.pow(2, variables.size()) * XADDBuild.context.evaluate(nodeId, new HashMap<>(), new HashMap<>());
