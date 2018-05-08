@@ -1,7 +1,5 @@
 package diagram;
 
-import basic.MathUtil;
-import function.Functional;
 import math.Range;
 import pair.TypePair;
 import scpsolver.constraints.LinearBiggerThanEqualsConstraint;
@@ -18,7 +16,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 import static function.Architect.map;
 
@@ -185,6 +182,7 @@ public class OptimizationObserver implements XADDiagram.NodeWalkerObserver<Optim
 
 	@Override
 	public OptimizationObserver.ValuedAssignment calculate(int nodeId, XADD.XADDTNode node, OptimizationState state) {
+		System.out.println("TEST");
 		System.out.println();
 		ExprLib.ArithExpr expr = node._expr;
 		System.out.println(expr);

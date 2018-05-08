@@ -1,15 +1,9 @@
 package scenario;
 
-import diagram.XADDBuild;
 import diagram.XADDiagram;
-import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.Arrays;
-import java.util.Collections;
-
 import static diagram.XADDBuild.*;
-import static diagram.XADDiagram.*;
 import static java.util.Arrays.asList;
 import static java.util.Collections.emptyList;
 import static org.junit.Assert.assertEquals;

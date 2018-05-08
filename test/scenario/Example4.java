@@ -2,10 +2,8 @@ package scenario;
 
 import diagram.BoolXADD;
 import diagram.XADDiagram;
-import org.junit.Assert;
 import org.junit.Test;
 
-import java.util.Collections;
 import java.util.function.Function;
 
 import static diagram.XADDBuild.*;

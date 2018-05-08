@@ -1,10 +1,8 @@
 package diagram;
 
-import algebra.LinearGLPKSolver;
-import algebra.Solver;
+import solving.Solver;
 import build.Factory;
 import pair.TypePair;
-import scpsolver.lpsolver.GLPKSolver;
 import xadd.XADD;
 
 /**

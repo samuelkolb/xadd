@@ -1,13 +1,13 @@
 package diagram;
 
-import function.Architect;
 import xadd.XADD;
 
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.Map;
 
-import static diagram.XADDBuild.*;
+import static diagram.XADDBuild.builder;
 import static function.Architect.*;
 import static function.Functional.fold;
 
@@ -18,8 +18,12 @@ import static function.Functional.fold;
  */
 public class BoolXADD extends XADDiagram {
 
-	protected BoolXADD(int number) {
-		super(number);
+	public BoolXADD(XADD xadd, int number) {
+		super(xadd, number);
+	}
+
+	protected BoolXADD boolXadd(int number) {
+		return new BoolXADD(xadd, number);
 	}
 
 	/**
@@ -37,7 +41,7 @@ public class BoolXADD extends XADDiagram {
 	 * @return The resulting diagram
 	 */
 	public BoolXADD or(BoolXADD diagram) {
-		return convert(plus(diagram).min(val(1)), false);
+		return convert(plus(diagram).min(builder(xadd).val(1)), false);
 	}
 
 	/**
@@ -45,7 +49,7 @@ public class BoolXADD extends XADDiagram {
 	 * @return	The resulting diagram
 	 */
 	public BoolXADD not() {
-		return convert(plus(val(-1)).times(val(-1)), false);
+		return convert(plus(builder(xadd).val(-1)).times(builder(xadd).val(-1)), false);
 	}
 
 	/**
@@ -55,7 +59,7 @@ public class BoolXADD extends XADDiagram {
 	 * @return	The combined XADD
 	 */
 	public XADDiagram assignWeights(XADDiagram weightTrue, XADDiagram weightFalse) {
-		return cases(map(this, this.not()).to(weightTrue, weightFalse));
+		return builder(xadd).cases(map(this, this.not()).to(weightTrue, weightFalse));
 	}
 
 	/**
@@ -76,6 +80,12 @@ public class BoolXADD extends XADDiagram {
 		return fold(this, XADDiagram::times, weights);
 	}
 
+	@Override
+	public BoolXADD evaluatePartial(Map<String, Boolean> booleanVariables, Map<String, Double> continuousVariables) {
+		return convert(super.evaluatePartial(booleanVariables, continuousVariables), false);
+	}
+
+
 	/**
 	 * Convert the given XADD
 	 * @param diagram	The diagram to convert
@@ -92,20 +102,20 @@ public class BoolXADD extends XADDiagram {
 	 * @return	The corresponding boolean XADD
 	 */
 	public static BoolXADD convert(XADDiagram diagram, boolean check) {
-		if(check && !isBool(diagram.number)) {
+		if(check && !isBool(diagram.xadd, diagram.number)) {
 			throw new IllegalArgumentException("The given XADD does not have boolean (1 or 0) values");
 		}
-		return new BoolXADD(diagram.number);
+		return new BoolXADD(diagram.xadd, diagram.number);
 	}
 
-	private static boolean isBool(int nodeId) {
+	private static boolean isBool(XADD context, int nodeId) {
 		XADD.XADDNode node = context.getNode(nodeId);
 		if(node instanceof XADD.XADDTNode) {
 			double value = context.evaluate(nodeId, new HashMap<>(), new HashMap<>());
 			return value == 1 || value == 0;
 		} else if(node instanceof XADD.XADDINode) {
 			XADD.XADDINode iNode = (XADD.XADDINode) node;
-			return isBool(iNode._high) && isBool(iNode._low);
+			return isBool(context, iNode._high) && isBool(context, iNode._low);
 		} else {
 			throw new IllegalStateException("Unexpected structural error");
 		}

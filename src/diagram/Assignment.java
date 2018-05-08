@@ -1,5 +1,6 @@
 package diagram;
 
+import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 
@@ -33,8 +34,12 @@ public class Assignment {
 	}
 
 	public Assignment(Map<String, Boolean> booleanVariables, Map<String, Double> continuousVariables) {
-		this.booleanVariables = booleanVariables;
-		this.continuousVariables = continuousVariables;
+		this.booleanVariables = new HashMap<>(booleanVariables);
+		this.continuousVariables = new HashMap<>(continuousVariables);
+	}
+
+	public Assignment() {
+		this(new HashMap<>(), new HashMap<>());
 	}
 
 	public Boolean getBool(String name) {
@@ -47,6 +52,30 @@ public class Assignment {
 
 	public <R> Valued<R> value(R value) {
 		return new Valued<R>(this, value);
+	}
+
+	/**
+	 * Creates a new assignment that extends this assignment with a new boolean variable
+	 * @param name	The name of the new boolean variable
+	 * @param value	The value to be assigned to the new variable
+	 * @return	A new assignment containing all previous variables and the new variable
+	 */
+	public Assignment setBool(String name, Boolean value) {
+		Map<String, Boolean> boolVars = new HashMap<>(booleanVariables);
+		boolVars.put(name, value);
+		return new Assignment(boolVars, continuousVariables);
+	}
+
+	/**
+	 * Creates a new assignment that extends this assignment with a new real variable
+	 * @param name	The name of the new variable
+	 * @param value	The value to be assigned to the new real variable
+	 * @return	A new assignment containing all previous variables and the new variable
+	 */
+	public Assignment setReal(String name, Double value) {
+		Map<String, Double> realVars = new HashMap<>(continuousVariables);
+		realVars.put(name, value);
+		return new Assignment(booleanVariables, realVars);
 	}
 
 	@Override

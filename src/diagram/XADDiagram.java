@@ -1,11 +1,14 @@
 package diagram;
 
-import algebra.JOptSolver;
-import algebra.LinearGLPKSolver;
+import solving.JOptSolver;
+import solving.LinearGLPKSolver;
 import pair.TypePair;
 import xadd.ExprLib;
 import xadd.XADD;
 
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -14,6 +17,7 @@ import java.util.Set;
 
 import static function.Architect.*;
 import static function.Functional.*;
+import static java.lang.String.format;
 
 /**
  * The XADDiagram class encapsulates XADD representations and operations.
@@ -32,9 +36,11 @@ public class XADDiagram {
 
 	private static class IntegrationObserver implements NodeWalkerObserver<Set<String>, Double> {
 
+		private XADD xadd;
 		private Set<String> initial;
 
-		private IntegrationObserver(Set<String> initial) {
+		private IntegrationObserver(XADD xadd, Set<String> initial) {
+			this.xadd = xadd;
 			this.initial = initial;
 		}
 
@@ -45,7 +51,7 @@ public class XADDiagram {
 
 		@Override
 		public Double calculate(int nodeId, XADD.XADDTNode node, Set<String> state) {
-			return Math.pow(2, state.size()) * XADDBuild.context.evaluate(nodeId, new HashMap<>(), new HashMap<>());
+			return Math.pow(2, state.size()) * xadd.evaluate(nodeId, new HashMap<>(), new HashMap<>());
 		}
 
 		@Override
@@ -64,10 +70,16 @@ public class XADDiagram {
 	}
 
 	// Data: number
-	protected int number;
+	public final XADD xadd;
+	public final int number;
 
-	protected XADDiagram(int number) {
+	public XADDiagram(XADD context, int number) {
+		this.xadd = context;
 		this.number = number;
+	}
+
+	protected XADDiagram xadd(int number) {
+		return new XADDiagram(xadd, number);
 	}
 
 	/**
@@ -76,7 +88,7 @@ public class XADDiagram {
 	 * @return The resulting diagram
 	 */
 	public XADDiagram times(XADDiagram diagram) {
-		return new XADDiagram(XADDBuild.context.apply(this.number, diagram.number, XADD.PROD));
+		return xadd(xadd.apply(this.number, diagram.number, XADD.PROD));
 	}
 
 	/**
@@ -85,7 +97,7 @@ public class XADDiagram {
 	 * @return The resulting diagram
 	 */
 	public XADDiagram plus(XADDiagram diagram) {
-		return new XADDiagram(XADDBuild.context.apply(this.number, diagram.number, XADD.SUM));
+		return xadd(xadd.apply(this.number, diagram.number, XADD.SUM));
 	}
 
 	/**
@@ -94,7 +106,7 @@ public class XADDiagram {
 	 * @return The resulting diagram
 	 */
 	public XADDiagram min(XADDiagram diagram) {
-		return new XADDiagram(XADDBuild.context.apply(this.number, diagram.number, XADD.MIN));
+		return xadd(xadd.apply(this.number, diagram.number, XADD.MIN));
 	}
 
 	/**
@@ -103,7 +115,11 @@ public class XADDiagram {
 	 * @return The resulting diagram
 	 */
 	public XADDiagram max(XADDiagram diagram) {
-		return new XADDiagram(XADDBuild.context.apply(this.number, diagram.number, XADD.MAX));
+		return xadd(xadd.apply(this.number, diagram.number, XADD.MAX));
+	}
+
+	public double evaluate() {
+		return evaluate(new HashMap<>(), new HashMap<>());
 	}
 
 	public double evaluate(Assignment assignment) {
@@ -117,18 +133,151 @@ public class XADDiagram {
 	 * @return	The result of the evaluation
 	 */
 	public Double evaluate(Map<String, Boolean> booleanVariables, Map<String, Double> continuousVariables) {
-		return XADDBuild.context.evaluate(this.number, new HashMap<>(booleanVariables), new HashMap<>(continuousVariables));
+		Double result = xadd.evaluate(number, new HashMap<>(booleanVariables), new HashMap<>(continuousVariables));
+		if(result == null) {
+			Set<String> found = xadd.collectVars(number);
+			Set<String> given = new HashSet<>(booleanVariables.keySet());
+			given.addAll(continuousVariables.keySet());
+			found.removeAll(given);
+			throw new IllegalArgumentException("Not all required variables were assigned, missing: " + found);
+		}
+		return result;
 	}
 
 	public Double integrate(List<String> booleanVariables, List<String> continuousVariables) {
-		int boolOnly = fold(this.number, XADDBuild.context::computeDefiniteIntegral, continuousVariables);
-		return new XADDiagram(boolOnly).walk(new IntegrationObserver(set(booleanVariables)));
+		int boolOnly = fold(this.number, xadd::computeDefiniteIntegral, continuousVariables);
+		return xadd(boolOnly).walk(new IntegrationObserver(xadd, set(booleanVariables)));
+	}
+
+	public XADDiagram getIntegratedDiagram(List<String> booleanVariables, List<String> continuousVariables) {
+		int result = fold(this.number, xadd::computeDefiniteIntegral, continuousVariables);
+		for(String booleanVar : booleanVariables) {
+			// TODO just double if it does not occur
+			int trueBranch = xadd.substituteBoolVars(result, map(booleanVar).to(true));
+			int falseBranch = xadd.substituteBoolVars(result, map(booleanVar).to(false));
+			result = xadd.apply(trueBranch, falseBranch, XADD.SUM);
+		}
+		return xadd(result);
+	}
+
+	/**
+	 * Wrapper for vararg arguments
+	 * @param variables	The real variables to eliminate
+	 * @return	eliminateRealVars(asList(variables))
+	 */
+	public XADDiagram eliminateRealVars(String... variables) {
+		return eliminateRealVars(Arrays.asList(variables));
+	}
+
+	/**
+	 * Wrapper for vararg arguments
+	 * @param variables	The real variables to eliminate
+	 * @return	eliminateRealVars(asList(variables))
+	 */
+	public XADDiagram eliminateRealVarsSym(String... variables) {
+		return eliminateRealVarsSym(Arrays.asList(variables));
+	}
+
+	/**
+	 * Wrapper for real variables
+	 * @param variables	The real variables to eliminate
+	 * @return	eliminateVars(variables, [real] * len(variables))
+	 */
+	public XADDiagram eliminateRealVars(List<String> variables) {
+		return eliminateVars(variables, Collections.nCopies(variables.size(), "real"));
+	}
+
+	/**
+	 * Wrapper for real variables
+	 * @param variables	The real variables to eliminate
+	 * @return	eliminateVars(variables, [real] * len(variables))
+	 */
+	public XADDiagram eliminateRealVarsSym(List<String> variables) {
+		return eliminateVarsSym(variables, Collections.nCopies(variables.size(), "real"));
+	}
+
+	/**
+	 * Wrapper for vararg arguments
+	 * @param variables	The boolean variables to eliminate
+	 * @return	eliminateBoolVars(asList(variables))
+	 */
+	public XADDiagram eliminateBoolVars(String... variables) {
+		return eliminateBoolVars(Arrays.asList(variables));
+	}
+
+	/**
+	 * Wrapper for boolean variables
+	 * @param variables	The boolean variables to eliminate
+	 * @return	eliminateVars(variables, [bool] * len(variables))
+	 */
+	public XADDiagram eliminateBoolVars(List<String> variables) {
+		return eliminateVars(variables, Collections.nCopies(variables.size(), "bool"));
+	}
+
+	/**
+	 * Wrapper for vararg arguments
+	 * @param variables	The boolean variables to eliminate
+	 * @return	eliminateBoolVars(asList(variables))
+	 */
+	public XADDiagram eliminateBoolVarsSym(String... variables) {
+		return eliminateBoolVarsSym(Arrays.asList(variables));
+	}
+
+	/**
+	 * Wrapper for boolean variables
+	 * @param variables	The boolean variables to eliminate
+	 * @return	eliminateVars(variables, [bool] * len(variables))
+	 */
+	public XADDiagram eliminateBoolVarsSym(List<String> variables) {
+		return eliminateVarsSym(variables, Collections.nCopies(variables.size(), "bool"));
+	}
+
+	/**
+	 * Eliminate the given variables from this diagram and return the resulting diagram (using bound-resolve)
+	 * @param variables	The variables to eliminate
+	 * @param types	The types of the variables
+	 * @return	The diagram in which the variables have been eliminated
+	 */
+	public XADDiagram eliminateVars(List<String> variables, List<String> types) {
+		if(variables.size() != types.size()) {
+			throw new IllegalArgumentException(format("Diverging number of variables (%d) and types (%d)",
+					variables.size(), types.size()));
+		}
+		ResolveIntegration integrator = new ResolveIntegration(xadd);
+		int result = number;
+		for(int i = 0; i < variables.size(); i++) {
+			result = integrator.integrate(result, variables.get(i), types.get(i));
+			// new XADDiagram(this.xadd, result).show("After " + variables.get(i));
+			// result = this.xadd.reduceLP(result);
+		}
+		return new XADDiagram(xadd, result);
+	}
+
+	/**
+	 * Eliminate the given variables from this diagram and return the resulting diagram (using bound-resolve)
+	 * @param variables	The variables to eliminate
+	 * @param types	The types of the variables
+	 * @return	The diagram in which the variables have been eliminated
+	 */
+	public XADDiagram eliminateVarsSym(List<String> variables, List<String> types) {
+		if(variables.size() != types.size()) {
+			throw new IllegalArgumentException(format("Diverging number of variables (%d) and types (%d)",
+					variables.size(), types.size()));
+		}
+		SymbolicResolveIntegration integrator = new SymbolicResolveIntegration(xadd);
+		int result = number;
+		for(int i = 0; i < variables.size(); i++) {
+			result = integrator.integrate(result, variables.get(i), types.get(i));
+			// new XADDiagram(this.xadd, result).show("After " + variables.get(i));
+			// result = this.xadd.reduceLP(result);
+		}
+		return new XADDiagram(xadd, result);
 	}
 
 	private Double evaluateIntegration(Set<String> variables, int nodeId) {
-		XADD.XADDNode node = XADDBuild.context.getNode(nodeId);
+		XADD.XADDNode node = xadd.getNode(nodeId);
 		if(node instanceof XADD.XADDTNode) {
-			return Math.pow(2, variables.size()) * XADDBuild.context.evaluate(nodeId, new HashMap<>(), new HashMap<>());
+			return Math.pow(2, variables.size()) * xadd.evaluate(nodeId, new HashMap<>(), new HashMap<>());
 		} else if(node instanceof XADD.XADDINode) {
 			XADD.XADDINode iNode = (XADD.XADDINode) node;
 			if(!variables.remove(iNode.getDecision().toString())) {
@@ -141,8 +290,8 @@ public class XADDiagram {
 	}
 
 	public XADDiagram evaluatePartial(Map<String, Boolean> booleanVariables, Map<String, Double> continuousVariables) {
-		int temp = XADDBuild.context.substituteBoolVars(this.number, new HashMap<>(booleanVariables));
-		return new XADDiagram(XADDBuild.context.substitute(temp, map(ExprLib.DoubleExpr::new, continuousVariables)));
+		int temp = xadd.substituteBoolVars(this.number, new HashMap<>(booleanVariables));
+		return xadd(xadd.substitute(temp, map(ExprLib.DoubleExpr::new, continuousVariables)));
 		/*XADD.XADDNode node = context.getNode(this.number);
 		if(node instanceof XADD.XADDTNode) {
 			return node
@@ -167,7 +316,15 @@ public class XADDiagram {
 	}*/
 
 	public XADDiagram reduce() {
-		return new XADDiagram(XADDBuild.context.reduce(this.number));
+		return xadd(xadd.reduce(this.number));
+	}
+
+	public XADDiagram reduceLp() {
+		return xadd(xadd.reduceLP(this.number));
+	}
+
+	public Double maxValue() {
+		return xadd.linMaxVal(this.number);
 	}
 
 	public Assignment maxArg() {
@@ -178,23 +335,27 @@ public class XADDiagram {
 		return this.walk(new Optimization(false, () -> new JOptSolver(getContinuous()))).assignment;
 	}
 
+	private Assignment.Valued<Double> maxAssignment() {
+		return  this.walk(new Optimization(false, () -> new LinearGLPKSolver(getContinuous())));
+	}
+
 	/**
 	 * Walk this XADD with the given observer
 	 * @param observer	The observer
 	 * @return	The result as aggregated by the observer
 	 */
 	public <S, R> R walk(NodeWalkerObserver<S, R> observer) {
-		return walk(this.number, observer, observer.getInitial());
+		return walk(xadd, this.number, observer, observer.getInitial());
 	}
 
-	private static <S, R> R walk(int nodeId, NodeWalkerObserver<S, R> observer, S state) {
-		XADD.XADDNode node = XADDBuild.context.getNode(nodeId);
+	private static <S, R> R walk(XADD xadd, int nodeId, NodeWalkerObserver<S, R> observer, S state) {
+		XADD.XADDNode node = xadd.getNode(nodeId);
 		if(node instanceof XADD.XADDTNode) {
 			return observer.calculate(nodeId, (XADD.XADDTNode) node, state);
 		} else if(node instanceof XADD.XADDINode) {
 			XADD.XADDINode iNode = (XADD.XADDINode) node;
 			TypePair<S> pair = observer.update(nodeId, iNode, state);
-			return observer.combine(walk(iNode._low, observer, pair.one()), walk(iNode._high, observer, pair.two()));
+			return observer.combine(walk(xadd, iNode._low, observer, pair.one()), walk(xadd, iNode._high, observer, pair.two()));
 		} else {
 			throw new IllegalStateException("Unexpected structural error");
 		}
@@ -206,7 +367,15 @@ public class XADDiagram {
 	 * @param title	The given title
 	 */
 	public void show(String title) {
-		XADDBuild.context.showGraph(this.number, title);
+		xadd.showGraph(this.number, title);
+	}
+
+	/**
+	 * Exports a graph representation to a file.
+	 * @param filename	The name of the file
+	 */
+	public void exportGraph(String filename) {
+		xadd.getGraph(this.number).genDotFile(filename);
 	}
 
 	/**
@@ -214,7 +383,7 @@ public class XADDiagram {
 	 * @param filename	The name of the file
 	 */
 	public void export(String filename) {
-		XADDBuild.context.exportXADDToFile(this.number, filename);
+		xadd.exportXADDToFile(this.number, filename);
 	}
 
 	public Set<String> getDiscrete() {

@@ -11,7 +11,6 @@ import java.util.Scanner;
 
 import static diagram.XADDBuild.*;
 import static function.Architect.*;
-import static function.Functional.*;
 import static java.util.Arrays.asList;
 
 /**

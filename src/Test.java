@@ -1,9 +1,6 @@
-import diagram.XADDiagram;
 import log.Suppress;
-import lpsolve.LP;
 import scpsolver.constraints.LinearSmallerThanEqualsConstraint;
 import scpsolver.lpsolver.GLPKSolver;
-import scpsolver.lpsolver.LinearProgramSolver;
 import scpsolver.lpsolver.SolverFactory;
 import scpsolver.problems.LinearProgram;
 

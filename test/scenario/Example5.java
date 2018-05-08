@@ -2,11 +2,7 @@ package scenario;
 
 import diagram.Assignment;
 import diagram.BoolXADD;
-import diagram.XADDBuild;
 import diagram.XADDiagram;
-import function.Architect;
-import function.Functional;
-import org.junit.Assert;
 import org.junit.Test;
 
 import static diagram.XADDBuild.*;
